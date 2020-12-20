@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math';
 
 void main() {
   runApp(MainApp());
@@ -87,6 +88,15 @@ class _ImageViewerState extends State<ImageViewer>
 
   @override
   Widget build(BuildContext context) {
+    double page = _pageController.hasClients ? _pageController.page ?? 0 : 0;
+    final transformationController =
+        _transformationControllers[(page.toInt() + 1) % 2];
+    final translation = transformationController.value.getTranslation();
+    final normalMatrix = transformationController.value.getNormalMatrix();
+    final scale = normalMatrix.getRow(0)[0];
+    final viewerHeight = (MediaQuery.of(context).size.height - 60 - 30 - 30);
+    final viewerWeight = (MediaQuery.of(context).size.width - 60);
+
     return Column(
       children: [
         Expanded(
@@ -97,12 +107,56 @@ class _ImageViewerState extends State<ImageViewer>
               children: [
                 for (int i = 0; i < widget.images.length; i++)
                   ClipRect(
-                    child: InteractiveViewer(
-                      transformationController:
-                          _transformationControllers[(i + 1) % 2],
-                      onInteractionStart: _onInteractionStart,
-                      maxScale: 20,
-                      child: Center(child: widget.images[i]),
+                    child: Stack(
+                      children: [
+                        Column(
+                          children: [
+                            Text('x ${1.0 / scale}'),
+                            Text(
+                                '[${translation[0].toInt().abs()}, ${translation[1].toInt().abs()}, ${translation[2].toInt()}]'),
+                          ],
+                        ),
+                        Positioned(
+                          top: 30.0 + viewerHeight - 4,
+                          left: 30.0 + (translation[0] * scale).abs(),
+                          child: Container(
+                            width: viewerWeight * scale,
+                            height: viewerHeight * scale,
+                            decoration: BoxDecoration(
+                                border: Border(
+                              top: BorderSide(color: Colors.black54, width: 4),
+                            )),
+                          ),
+                        ),
+                        Positioned(
+                          top: 30.0 + (translation[1] * scale).abs(),
+                          left: 30.0 + viewerWeight - 4,
+                          child: Container(
+                            width: viewerWeight * scale,
+                            height: viewerHeight * scale,
+                            decoration: BoxDecoration(
+                                border: Border(
+                              left: BorderSide(color: Colors.black54, width: 4),
+                            )),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(30.0),
+                          child: ClipRect(
+                            child: InteractiveViewer(
+                              transformationController:
+                                  _transformationControllers[(i + 1) % 2],
+                              onInteractionStart: _onInteractionStart,
+                              onInteractionEnd: (_) {
+                                setState(() {
+                                });
+                              },
+                              maxScale: 2,
+                              child: Center(child: widget.images[i]),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   )
               ],
