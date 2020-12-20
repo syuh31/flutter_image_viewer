@@ -64,6 +64,10 @@ class _ImageViewerState extends State<ImageViewer>
   Animation<Matrix4> _resetAnimationMatrix;
   AnimationController _resetController;
   Animation _resetAnimation;
+  final key = GlobalKey();
+  OverlayEntry overlay1;
+  OverlayEntry overlay2;
+  OverlayEntry overlay3;
 
   @override
   void initState() {
@@ -77,6 +81,109 @@ class _ImageViewerState extends State<ImageViewer>
       parent: _resetController,
       curve: Curves.easeOutCubic,
     );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setState(() {
+        overlay1 = OverlayEntry(
+          builder: (BuildContext context) {
+            double page =
+                _pageController.hasClients ? _pageController.page ?? 0 : 0;
+            final transformationController =
+                _transformationControllers[(page.toInt() + 1) % 2];
+            final translation = transformationController.value.getTranslation();
+            final normalMatrix =
+                transformationController.value.getNormalMatrix();
+            final scale = normalMatrix.getRow(0)[0];
+            final viewerHeight =
+                (MediaQuery.of(context).size.height - 60 - 30 - 30);
+            final viewerWeight = (MediaQuery.of(context).size.width - 60);
+            RenderBox renderBox = key.currentContext.findRenderObject();
+            var size = renderBox.size;
+            var offset = renderBox.localToGlobal(Offset.zero);
+            return Positioned(
+              top: offset.dy,
+              left: offset.dx,
+              child: Material(
+                color: Colors.transparent,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('x ${1.0 / scale}'),
+                    Text(
+                        '[${translation[0].toInt().abs()}, ${translation[1].toInt().abs()}, ${translation[2].toInt()}]'),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+        Navigator.of(context).overlay.insert(overlay1);
+
+        overlay2 = OverlayEntry(
+          builder: (BuildContext context) {
+            double page =
+                _pageController.hasClients ? _pageController.page ?? 0 : 0;
+            final transformationController =
+                _transformationControllers[(page.toInt() + 1) % 2];
+            final translation = transformationController.value.getTranslation();
+            final normalMatrix =
+                transformationController.value.getNormalMatrix();
+            final scale = normalMatrix.getRow(0)[0];
+            final viewerHeight =
+                (MediaQuery.of(context).size.height - 60 - 30 - 30);
+            final viewerWeight = (MediaQuery.of(context).size.width - 60);
+            RenderBox renderBox = key.currentContext.findRenderObject();
+            var size = renderBox.size;
+            var offset = renderBox.localToGlobal(Offset.zero);
+            return Positioned(
+              top: 30.0 + viewerHeight - 4,
+              left: 30.0 + (translation[0] * scale).abs(),
+              child: Container(
+                width: viewerWeight * scale,
+                height: viewerHeight * scale,
+                decoration: BoxDecoration(
+                    border: Border(
+                  top: BorderSide(color: Colors.black54, width: 4),
+                )),
+              ),
+            );
+          },
+        );
+        Navigator.of(context).overlay.insert(overlay2);
+
+        overlay3 = OverlayEntry(
+          builder: (BuildContext context) {
+            double page =
+                _pageController.hasClients ? _pageController.page ?? 0 : 0;
+            final transformationController =
+                _transformationControllers[(page.toInt() + 1) % 2];
+            final translation = transformationController.value.getTranslation();
+            final normalMatrix =
+                transformationController.value.getNormalMatrix();
+            final scale = normalMatrix.getRow(0)[0];
+            final viewerHeight =
+                (MediaQuery.of(context).size.height - 60 - 30 - 30);
+            final viewerWeight = (MediaQuery.of(context).size.width - 60);
+            RenderBox renderBox = key.currentContext.findRenderObject();
+            var size = renderBox.size;
+            var offset = renderBox.localToGlobal(Offset.zero);
+            return Positioned(
+              top: 30.0 + (translation[1] * scale).abs(),
+              left: 30.0 + viewerWeight - 4,
+              child: Container(
+                width: viewerWeight * scale,
+                height: viewerHeight * scale,
+                decoration: BoxDecoration(
+                    border: Border(
+                  left: BorderSide(color: Colors.black54, width: 4),
+                )),
+              ),
+            );
+          },
+        );
+        Navigator.of(context).overlay.insert(overlay3);
+      });
+    });
   }
 
   @override
@@ -109,47 +216,18 @@ class _ImageViewerState extends State<ImageViewer>
                   ClipRect(
                     child: Stack(
                       children: [
-                        Column(
-                          children: [
-                            Text('x ${1.0 / scale}'),
-                            Text(
-                                '[${translation[0].toInt().abs()}, ${translation[1].toInt().abs()}, ${translation[2].toInt()}]'),
-                          ],
-                        ),
-                        Positioned(
-                          top: 30.0 + viewerHeight - 4,
-                          left: 30.0 + (translation[0] * scale).abs(),
-                          child: Container(
-                            width: viewerWeight * scale,
-                            height: viewerHeight * scale,
-                            decoration: BoxDecoration(
-                                border: Border(
-                              top: BorderSide(color: Colors.black54, width: 4),
-                            )),
-                          ),
-                        ),
-                        Positioned(
-                          top: 30.0 + (translation[1] * scale).abs(),
-                          left: 30.0 + viewerWeight - 4,
-                          child: Container(
-                            width: viewerWeight * scale,
-                            height: viewerHeight * scale,
-                            decoration: BoxDecoration(
-                                border: Border(
-                              left: BorderSide(color: Colors.black54, width: 4),
-                            )),
-                          ),
-                        ),
                         Padding(
                           padding: const EdgeInsets.all(30.0),
                           child: ClipRect(
                             child: InteractiveViewer(
+                              key: key,
                               transformationController:
                                   _transformationControllers[(i + 1) % 2],
                               onInteractionStart: _onInteractionStart,
                               onInteractionEnd: (_) {
-                                setState(() {
-                                });
+                                overlay1.markNeedsBuild();
+                                overlay2.markNeedsBuild();
+                                overlay3.markNeedsBuild();
                               },
                               maxScale: 2,
                               child: Center(child: widget.images[i]),
