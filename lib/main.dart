@@ -363,19 +363,29 @@ class _ImageViewerState extends State<ImageViewer>
         AnimatedSelectBorder(
           itemNum: widget.images.length,
           pageController: _pageController,
-          itemWidth: 30,
-          top: 30,
+          itemWidth: 40,
+          top: 40,
         ),
         Padding(
           padding: const EdgeInsets.only(bottom: 5),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              ...widget.images.map((e) => SizedBox(
-                    width: 30,
-                    height: 30,
-                    child: e,
-                  )),
+              for (int i = 0; i < widget.images.length; i++)
+                GestureDetector(
+                  onTap: () {
+                    _pageController.animateToPage(
+                      i,
+                      duration: Duration(milliseconds: 500),
+                      curve: Curves.easeInOutCirc,
+                    );
+                  },
+                  child: SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: widget.images[i],
+                  ),
+                ),
             ],
           ),
         ),
