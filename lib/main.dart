@@ -64,10 +64,25 @@ class _ImageViewerState extends State<ImageViewer>
   Animation<Matrix4> _resetAnimationMatrix;
   AnimationController _resetController;
   Animation _resetAnimation;
-  final key = GlobalKey();
-  OverlayEntry overlay1;
-  OverlayEntry overlay2;
-  OverlayEntry overlay3;
+  final GlobalKey viewerKey = GlobalKey();
+  List<OverlayEntry> _positionOverlays = <OverlayEntry>[];
+
+  final _positionBarWidth = 4.0;
+
+  var translation;
+  var scale;
+  Size viewerSize;
+  Offset viewerOffset;
+
+  TransformationController get currentTransitionController {
+    double page = _pageController.hasClients ? _pageController.page ?? .0 : .0;
+    return _transformationControllers[(page.toInt() + 1) % 2];
+  }
+
+  TransformationController get nextTransitionController {
+    double page = _pageController.hasClients ? _pageController.page ?? .0 : .0;
+    return _transformationControllers[(page.toInt()) % 2];
+  }
 
   @override
   void initState() {
@@ -84,110 +99,68 @@ class _ImageViewerState extends State<ImageViewer>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       setState(() {
-        overlay1 = OverlayEntry(
+        final transformationController = currentTransitionController;
+        translation = transformationController.value.getTranslation();
+        final normalMatrix = transformationController.value.getNormalMatrix();
+        scale = normalMatrix.getRow(0)[0];
+        RenderBox renderBox = viewerKey.currentContext.findRenderObject();
+        viewerSize = renderBox.size;
+        viewerOffset = renderBox
+            .localToGlobal(Offset.zero)
+            .translate(0, MediaQuery.of(context).padding.top);
+
+        final verticalPositionOverlay = OverlayEntry(
           builder: (BuildContext context) {
-            double page =
-                _pageController.hasClients ? _pageController.page ?? 0 : 0;
-            final transformationController =
-                _transformationControllers[(page.toInt() + 1) % 2];
-            final translation = transformationController.value.getTranslation();
-            final normalMatrix =
-                transformationController.value.getNormalMatrix();
-            final scale = normalMatrix.getRow(0)[0];
-            final viewerHeight =
-                (MediaQuery.of(context).size.height - 60 - 30 - 30);
-            final viewerWeight = (MediaQuery.of(context).size.width - 60);
-            RenderBox renderBox = key.currentContext.findRenderObject();
-            var size = renderBox.size;
-            var offset = renderBox.localToGlobal(Offset.zero);
             return Positioned(
-              top: offset.dy,
-              left: offset.dx,
-              child: Material(
-                color: Colors.transparent,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('x ${1.0 / scale}'),
-                    Text(
-                        '[${translation[0].toInt().abs()}, ${translation[1].toInt().abs()}, ${translation[2].toInt()}]'),
-                  ],
+              top: viewerOffset.dy + viewerSize.height - _positionBarWidth,
+              left: viewerOffset.dx + (translation[0] * scale).abs(),
+              child: Offstage(
+                offstage: scale == 1.0,
+                child: Container(
+                  width: viewerSize.width * scale,
+                  height: viewerSize.height * scale,
+                  decoration: BoxDecoration(
+                      border: Border(
+                    top: BorderSide(
+                        color: Colors.black54, width: _positionBarWidth),
+                  )),
                 ),
               ),
             );
           },
         );
-        Navigator.of(context).overlay.insert(overlay1);
 
-        overlay2 = OverlayEntry(
+        final horizontalPositionOverlay = OverlayEntry(
           builder: (BuildContext context) {
-            double page =
-                _pageController.hasClients ? _pageController.page ?? 0 : 0;
-            final transformationController =
-                _transformationControllers[(page.toInt() + 1) % 2];
-            final translation = transformationController.value.getTranslation();
-            final normalMatrix =
-                transformationController.value.getNormalMatrix();
-            final scale = normalMatrix.getRow(0)[0];
-            final viewerHeight =
-                (MediaQuery.of(context).size.height - 60 - 30 - 30);
-            final viewerWeight = (MediaQuery.of(context).size.width - 60);
-            RenderBox renderBox = key.currentContext.findRenderObject();
-            var size = renderBox.size;
-            var offset = renderBox.localToGlobal(Offset.zero);
             return Positioned(
-              top: 30.0 + viewerHeight - 4,
-              left: 30.0 + (translation[0] * scale).abs(),
-              child: Container(
-                width: viewerWeight * scale,
-                height: viewerHeight * scale,
-                decoration: BoxDecoration(
-                    border: Border(
-                  top: BorderSide(color: Colors.black54, width: 4),
-                )),
+              top: viewerOffset.dy + (translation[1] * scale).abs(),
+              left: viewerOffset.dx + viewerSize.width - _positionBarWidth,
+              child: Offstage(
+                offstage: scale == 1.0,
+                child: Container(
+                  width: viewerSize.width * scale,
+                  height: viewerSize.height * scale,
+                  decoration: BoxDecoration(
+                      border: Border(
+                    left: BorderSide(
+                        color: Colors.black54, width: _positionBarWidth),
+                  )),
+                ),
               ),
             );
           },
         );
-        Navigator.of(context).overlay.insert(overlay2);
 
-        overlay3 = OverlayEntry(
-          builder: (BuildContext context) {
-            double page =
-                _pageController.hasClients ? _pageController.page ?? 0 : 0;
-            final transformationController =
-                _transformationControllers[(page.toInt() + 1) % 2];
-            final translation = transformationController.value.getTranslation();
-            final normalMatrix =
-                transformationController.value.getNormalMatrix();
-            final scale = normalMatrix.getRow(0)[0];
-            final viewerHeight =
-                (MediaQuery.of(context).size.height - 60 - 30 - 30);
-            final viewerWeight = (MediaQuery.of(context).size.width - 60);
-            RenderBox renderBox = key.currentContext.findRenderObject();
-            var size = renderBox.size;
-            var offset = renderBox.localToGlobal(Offset.zero);
-            return Positioned(
-              top: 30.0 + (translation[1] * scale).abs(),
-              left: 30.0 + viewerWeight - 4,
-              child: Container(
-                width: viewerWeight * scale,
-                height: viewerHeight * scale,
-                decoration: BoxDecoration(
-                    border: Border(
-                  left: BorderSide(color: Colors.black54, width: 4),
-                )),
-              ),
-            );
-          },
-        );
-        Navigator.of(context).overlay.insert(overlay3);
+        _positionOverlays
+            .addAll([verticalPositionOverlay, horizontalPositionOverlay]);
+        Navigator.of(context).overlay.insertAll(_positionOverlays);
       });
     });
   }
 
   @override
   void dispose() {
+    for (OverlayEntry entry in _positionOverlays) entry.remove();
     _resetController.dispose();
     _pageController.dispose();
     super.dispose();
@@ -195,49 +168,40 @@ class _ImageViewerState extends State<ImageViewer>
 
   @override
   Widget build(BuildContext context) {
-    double page = _pageController.hasClients ? _pageController.page ?? 0 : 0;
-    final transformationController =
-        _transformationControllers[(page.toInt() + 1) % 2];
-    final translation = transformationController.value.getTranslation();
-    final normalMatrix = transformationController.value.getNormalMatrix();
-    final scale = normalMatrix.getRow(0)[0];
-    final viewerHeight = (MediaQuery.of(context).size.height - 60 - 30 - 30);
-    final viewerWeight = (MediaQuery.of(context).size.width - 60);
-
     return Column(
       children: [
         Expanded(
           child: Stack(children: [
-            PageView(
-              controller: _pageController,
-              physics: NeverScrollableScrollPhysics(),
-              children: [
-                for (int i = 0; i < widget.images.length; i++)
-                  ClipRect(
-                    child: Stack(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(30.0),
-                          child: ClipRect(
-                            child: InteractiveViewer(
-                              key: key,
-                              transformationController:
-                                  _transformationControllers[(i + 1) % 2],
-                              onInteractionStart: _onInteractionStart,
-                              onInteractionEnd: (_) {
-                                overlay1.markNeedsBuild();
-                                overlay2.markNeedsBuild();
-                                overlay3.markNeedsBuild();
-                              },
-                              maxScale: 2,
-                              child: Center(child: widget.images[i]),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-              ],
+            Padding(
+              padding: const EdgeInsets.all(30.0),
+              child: PageView(
+                key: viewerKey,
+                controller: _pageController,
+                physics: NeverScrollableScrollPhysics(),
+                children: [
+                  for (int i = 0; i < widget.images.length; i++)
+                    ClipRect(
+                      child: InteractiveViewer(
+                        transformationController: currentTransitionController,
+                        onInteractionStart: _onInteractionStart,
+                        onInteractionUpdate: (_) {},
+                        onInteractionEnd: (_) {
+                          final transformationController =
+                              currentTransitionController;
+                          translation =
+                              transformationController.value.getTranslation();
+                          final normalMatrix =
+                              transformationController.value.getNormalMatrix();
+                          scale = normalMatrix.getRow(0)[0];
+                          for (OverlayEntry entry in _positionOverlays)
+                            entry.markNeedsBuild();
+                        },
+                        maxScale: 2,
+                        child: Center(child: widget.images[i]),
+                      ),
+                    )
+                ],
+              ),
             ),
             Align(
               alignment: Alignment.bottomLeft,
@@ -246,9 +210,7 @@ class _ImageViewerState extends State<ImageViewer>
                 children: [
                   IconButton(
                     onPressed: () {
-                      _transformationControllers[
-                              _pageController.page.toInt() % 2]
-                          .value = Matrix4.identity();
+                      nextTransitionController.value = Matrix4.identity();
                       _pageController.previousPage(
                           duration: Duration(milliseconds: 500),
                           curve: Curves.easeInOutCirc);
@@ -264,9 +226,7 @@ class _ImageViewerState extends State<ImageViewer>
                     hoverColor: Colors.red,
                     highlightColor: Colors.purple,
                     onPressed: () {
-                      _transformationControllers[
-                              _pageController.page.toInt() % 2]
-                          .value = Matrix4.identity();
+                      nextTransitionController.value = Matrix4.identity();
                       _pageController.nextPage(
                           duration: Duration(milliseconds: 500),
                           curve: Curves.easeInOutCirc);
@@ -296,8 +256,7 @@ class _ImageViewerState extends State<ImageViewer>
   }
 
   void onChangedResetControllerMatrix() {
-    final transformationController =
-        _transformationControllers[(_pageController.page.toInt() + 1) % 2];
+    final transformationController = currentTransitionController;
 
     transformationController.value = _resetAnimationMatrix.value;
 
@@ -309,8 +268,7 @@ class _ImageViewerState extends State<ImageViewer>
   }
 
   void _resetViewerMatrix() {
-    final transformationController =
-        _transformationControllers[(_pageController.page.toInt() + 1) % 2];
+    final transformationController = currentTransitionController;
 
     _resetController.reset();
     _resetAnimationMatrix = Matrix4Tween(
