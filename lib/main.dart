@@ -74,6 +74,8 @@ class _ImageViewerState extends State<ImageViewer>
   Size viewerSize;
   Offset viewerOffset;
 
+  bool canScrollPage = false;
+
   TransformationController get currentTransitionController {
     double page = _pageController.hasClients ? _pageController.page ?? .0 : .0;
     return _transformationControllers[(page.toInt() + 1) % 2];
@@ -109,7 +111,7 @@ class _ImageViewerState extends State<ImageViewer>
             .localToGlobal(Offset.zero)
             .translate(0, MediaQuery.of(context).padding.top);
 
-        final verticalPositionOverlay = OverlayEntry(
+        final _horizontalPositionOverlay = OverlayEntry(
           builder: (BuildContext context) {
             return Positioned(
               top: viewerOffset.dy + viewerSize.height - _positionBarWidth,
@@ -130,7 +132,7 @@ class _ImageViewerState extends State<ImageViewer>
           },
         );
 
-        final horizontalPositionOverlay = OverlayEntry(
+        final _verticalPositionOverlay = OverlayEntry(
           builder: (BuildContext context) {
             return Positioned(
               top: viewerOffset.dy + (translation[1] * scale).abs(),
@@ -152,7 +154,7 @@ class _ImageViewerState extends State<ImageViewer>
         );
 
         _positionOverlays
-            .addAll([verticalPositionOverlay, horizontalPositionOverlay]);
+            .addAll([_horizontalPositionOverlay, _verticalPositionOverlay]);
         Navigator.of(context).overlay.insertAll(_positionOverlays);
       });
     });
@@ -166,38 +168,57 @@ class _ImageViewerState extends State<ImageViewer>
     super.dispose();
   }
 
+  Offset _tapPosition = Offset(0, 0);
+
+  void _handleTapDown(TapDownDetails details) {
+    final RenderBox referenceBox = context.findRenderObject();
+    setState(() {
+      _tapPosition = referenceBox.globalToLocal(details.globalPosition);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         Expanded(
           child: Stack(children: [
+            Column(
+              children: [
+                Text('$_tapPosition'),
+                Text('$scale'),
+              ],
+            ),
             Padding(
               padding: const EdgeInsets.all(30.0),
               child: PageView(
                 key: viewerKey,
                 controller: _pageController,
-                physics: NeverScrollableScrollPhysics(),
+                physics: canScrollPage
+                    ? ScrollPhysics()
+                    : NeverScrollableScrollPhysics(),
                 children: [
                   for (int i = 0; i < widget.images.length; i++)
                     ClipRect(
-                      child: InteractiveViewer(
-                        transformationController: currentTransitionController,
-                        onInteractionStart: _onInteractionStart,
-                        onInteractionUpdate: (_) {},
-                        onInteractionEnd: (_) {
-                          final transformationController =
-                              currentTransitionController;
-                          translation =
-                              transformationController.value.getTranslation();
-                          final normalMatrix =
-                              transformationController.value.getNormalMatrix();
-                          scale = normalMatrix.getRow(0)[0];
-                          for (OverlayEntry entry in _positionOverlays)
-                            entry.markNeedsBuild();
-                        },
-                        maxScale: 2,
-                        child: Center(child: widget.images[i]),
+                      child: GestureDetector(
+                        onTapDown: _handleTapDown,
+                        onTap: tapScale,
+                        child: InteractiveViewer(
+                          transformationController: currentTransitionController,
+                          onInteractionStart: _onInteractionStart,
+                          onInteractionUpdate: (_) {
+                            updateTransitionAndScale();
+                            for (OverlayEntry entry in _positionOverlays)
+                              entry.markNeedsBuild();
+                          },
+                          onInteractionEnd: (_) {
+                            updateTransitionAndScale();
+                            for (OverlayEntry entry in _positionOverlays)
+                              entry.markNeedsBuild();
+                          },
+                          maxScale: 5,
+                          child: Center(child: widget.images[i]),
+                        ),
                       ),
                     )
                 ],
@@ -253,6 +274,52 @@ class _ImageViewerState extends State<ImageViewer>
         buildBottomImages(context),
       ],
     );
+  }
+
+  void tapScale() {
+    setState(() {
+      final transitionController = currentTransitionController;
+      if (scale != 1.0) {
+        transitionController.value = Matrix4.identity();
+      } else {
+        final transitionController = currentTransitionController;
+        final matrix = transitionController.value;
+        final newScale = 3.0;
+        matrix.scale(newScale);
+        final iniX = (viewerSize.width * newScale) - (viewerSize.width);
+        final xOffset =
+            (viewerSize.width - (_tapPosition.dx - viewerOffset.dx)) * newScale;
+        var newX = (iniX - xOffset + viewerSize.width / 2);
+        if (newX < 0) {
+          newX = 0;
+        }
+        if (iniX < newX) {
+          newX = iniX;
+        }
+        final iniY = (viewerSize.height * newScale) - (viewerSize.height);
+        final yOffset =
+            (viewerSize.height - (_tapPosition.dy - viewerOffset.dy)) *
+                newScale;
+        var newY = (iniY - yOffset + viewerSize.height / 2);
+        if (newY < 0) {
+          newY = 0;
+        }
+        if (iniY < newY) {
+          newY = iniY;
+        }
+        matrix.setTranslationRaw(-newX, -newY, 0);
+        transitionController.value = matrix;
+      }
+      updateTransitionAndScale();
+      for (OverlayEntry entry in _positionOverlays) entry.markNeedsBuild();
+    });
+  }
+
+  void updateTransitionAndScale() {
+    final transformationController = currentTransitionController;
+    translation = transformationController.value.getTranslation();
+    final normalMatrix = transformationController.value.getNormalMatrix();
+    scale = normalMatrix.getRow(0)[0];
   }
 
   void onChangedResetControllerMatrix() {
