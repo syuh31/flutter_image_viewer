@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import 'package:vector_math/vector_math_64.dart' show Vector3;
 
 void main() {
   runApp(MainApp());
@@ -56,9 +57,19 @@ class ImageViewer extends StatefulWidget {
 class _ImageViewerState extends State<ImageViewer>
     with TickerProviderStateMixin {
   PageController _pageController;
+  Size viewerSize;
+  Offset viewerOffset;
   List<TransformationController> _transformationControllers = [
     TransformationController(),
-    TransformationController()
+    TransformationController(),
+  ];
+  List<Vector3> _translations = [
+    Vector3.zero(),
+    Vector3.zero(),
+  ];
+  List<double> _scales = [
+    1.0,
+    1.0,
   ];
 
   Animation<Matrix4> _resetAnimationMatrix;
@@ -69,21 +80,59 @@ class _ImageViewerState extends State<ImageViewer>
 
   final _positionBarWidth = 4.0;
 
-  var translation;
-  var scale;
-  Size viewerSize;
-  Offset viewerOffset;
+  // Vector3 translation;
+  // double scale;
 
   bool canScrollPage = false;
 
+  double get currentPage =>
+      _pageController.hasClients ? _pageController.page ?? .0 : .0;
+  int storageIndex = 0;
+
   TransformationController get currentTransitionController {
-    double page = _pageController.hasClients ? _pageController.page ?? .0 : .0;
-    return _transformationControllers[(page.toInt() + 1) % 2];
+    return _transformationControllers[storageIndex % 2];
   }
 
   TransformationController get nextTransitionController {
-    double page = _pageController.hasClients ? _pageController.page ?? .0 : .0;
-    return _transformationControllers[(page.toInt()) % 2];
+    return _transformationControllers[(storageIndex + 1) % 2];
+  }
+
+  Vector3 get currentTranslation {
+    return _translations[storageIndex % 2];
+  }
+
+  set currentTranslation(Vector3 value) {
+    _translations[storageIndex % 2] = value;
+  }
+
+  Vector3 get nextTranslation {
+    return _translations[(storageIndex + 1) % 2];
+  }
+
+  set nextTranslation(Vector3 value) {
+    _translations[(storageIndex + 1) % 2] = value;
+  }
+
+  double get currentScale {
+    return _scales[storageIndex % 2];
+  }
+
+  set currentScale(double value) {
+    _scales[storageIndex % 2] = value;
+  }
+
+  double get nextScale {
+    return _scales[(storageIndex + 1) % 2];
+  }
+
+  set nextScale(double value) {
+    _scales[(storageIndex + 1) % 2] = value;
+  }
+
+  void _onPageChanged(int newPage) {}
+
+  void _switchStorage() {
+    storageIndex = (storageIndex + 1) % 2;
   }
 
   @override
@@ -102,9 +151,9 @@ class _ImageViewerState extends State<ImageViewer>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       setState(() {
         final transformationController = currentTransitionController;
-        translation = transformationController.value.getTranslation();
+        currentTranslation = transformationController.value.getTranslation();
         final normalMatrix = transformationController.value.getNormalMatrix();
-        scale = normalMatrix.getRow(0)[0];
+        currentScale = normalMatrix.getRow(0)[0];
         RenderBox renderBox = viewerKey.currentContext.findRenderObject();
         viewerSize = renderBox.size;
         viewerOffset = renderBox
@@ -115,12 +164,13 @@ class _ImageViewerState extends State<ImageViewer>
           builder: (BuildContext context) {
             return Positioned(
               top: viewerOffset.dy + viewerSize.height - _positionBarWidth,
-              left: viewerOffset.dx + (translation[0] * scale).abs(),
+              left: viewerOffset.dx +
+                  (currentTranslation[0] * currentScale).abs(),
               child: Offstage(
-                offstage: scale == 1.0,
+                offstage: currentScale == 1.0,
                 child: Container(
-                  width: viewerSize.width * scale,
-                  height: viewerSize.height * scale,
+                  width: viewerSize.width * currentScale,
+                  height: _positionBarWidth,
                   decoration: BoxDecoration(
                       border: Border(
                     top: BorderSide(
@@ -135,13 +185,14 @@ class _ImageViewerState extends State<ImageViewer>
         final _verticalPositionOverlay = OverlayEntry(
           builder: (BuildContext context) {
             return Positioned(
-              top: viewerOffset.dy + (translation[1] * scale).abs(),
+              top: viewerOffset.dy +
+                  (currentTranslation[1] * currentScale).abs(),
               left: viewerOffset.dx + viewerSize.width - _positionBarWidth,
               child: Offstage(
-                offstage: scale == 1.0,
+                offstage: currentScale == 1.0,
                 child: Container(
-                  width: viewerSize.width * scale,
-                  height: viewerSize.height * scale,
+                  width: _positionBarWidth,
+                  height: viewerSize.height * currentScale,
                   decoration: BoxDecoration(
                       border: Border(
                     left: BorderSide(
@@ -186,7 +237,7 @@ class _ImageViewerState extends State<ImageViewer>
             Column(
               children: [
                 Text('$_tapPosition'),
-                Text('$scale'),
+                Text('$currentScale'),
               ],
             ),
             Padding(
@@ -197,6 +248,7 @@ class _ImageViewerState extends State<ImageViewer>
                 physics: canScrollPage
                     ? ScrollPhysics()
                     : NeverScrollableScrollPhysics(),
+                onPageChanged: _onPageChanged,
                 children: [
                   for (int i = 0; i < widget.images.length; i++)
                     ClipRect(
@@ -231,10 +283,20 @@ class _ImageViewerState extends State<ImageViewer>
                 children: [
                   IconButton(
                     onPressed: () {
+                      currentTranslation = Vector3.zero();
+                      currentScale = 1.0;
                       nextTransitionController.value = Matrix4.identity();
-                      _pageController.previousPage(
-                          duration: Duration(milliseconds: 500),
-                          curve: Curves.easeInOutCirc);
+                      for (OverlayEntry entry in _positionOverlays)
+                        entry.markNeedsBuild();
+                      _pageController
+                          .previousPage(
+                              duration: Duration(milliseconds: 500),
+                              curve: Curves.easeInOutCirc)
+                          .then((_) {
+                        _switchStorage();
+                        for (OverlayEntry entry in _positionOverlays)
+                          entry.markNeedsBuild();
+                      });
                     },
                     color: Theme.of(context).colorScheme.surface,
                     icon: const Icon(
@@ -247,10 +309,20 @@ class _ImageViewerState extends State<ImageViewer>
                     hoverColor: Colors.red,
                     highlightColor: Colors.purple,
                     onPressed: () {
+                      currentTranslation = Vector3.zero();
+                      currentScale = 1.0;
                       nextTransitionController.value = Matrix4.identity();
-                      _pageController.nextPage(
-                          duration: Duration(milliseconds: 500),
-                          curve: Curves.easeInOutCirc);
+                      for (OverlayEntry entry in _positionOverlays)
+                        entry.markNeedsBuild();
+                      _pageController
+                          .nextPage(
+                              duration: Duration(milliseconds: 500),
+                              curve: Curves.easeInOutCirc)
+                          .then((_) {
+                        _switchStorage();
+                        for (OverlayEntry entry in _positionOverlays)
+                          entry.markNeedsBuild();
+                      });
                     },
                     color: Theme.of(context).colorScheme.surface,
                     icon: const Icon(
@@ -279,7 +351,7 @@ class _ImageViewerState extends State<ImageViewer>
   void tapScale() {
     setState(() {
       final transitionController = currentTransitionController;
-      if (scale != 1.0) {
+      if (currentScale != 1.0) {
         transitionController.value = Matrix4.identity();
       } else {
         final transitionController = currentTransitionController;
@@ -317,9 +389,9 @@ class _ImageViewerState extends State<ImageViewer>
 
   void updateTransitionAndScale() {
     final transformationController = currentTransitionController;
-    translation = transformationController.value.getTranslation();
+    currentTranslation = transformationController.value.getTranslation();
     final normalMatrix = transformationController.value.getNormalMatrix();
-    scale = normalMatrix.getRow(0)[0];
+    currentScale = normalMatrix.getRow(0)[0];
   }
 
   void onChangedResetControllerMatrix() {
